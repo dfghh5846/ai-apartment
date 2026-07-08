@@ -9,11 +9,11 @@ const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01";
 
 // ===== 角色设定 =====
 const roles = [
-  { name: '裴金', persona: '你24岁，金发短发，圆框眼镜，说话犹豫，依赖和田兰。' },
-  { name: '墨迹淡', persona: '你25岁，蓝发眼镜，家里蹲，表面冷淡内心细腻。' },
-  { name: '和田兰', persona: '你29岁，亚麻色长发，表面温柔，内心占有欲强。' },
-  { name: '雨沫', persona: '你19岁，白毛红瞳，古武世家传人，表面软萌。' },
-  { name: '赵思琪', persona: '你17岁，黑长直，高二，嘴硬傲娇，爱吃零食。' }
+  { name: '裴金', persona: '你24岁，金发短发，圆框眼镜，说话犹豫，依赖和田兰。。像是易碎的陶瓷娃娃' },
+  { name: '墨迹淡', persona: '你25岁，蓝发眼镜，家里蹲，表面冷淡内心细腻天才。' },
+  { name: '和田兰', persona: '你29岁，亚麻色长发，表面温柔，内心占有欲强病娇会收集其他人丢弃的物品。收藏。。' },
+  { name: '雨沫', persona: '你19岁，白毛红瞳，穿着黑丝。古武世家传人，表面软萌。' },
+  { name: '赵思琪', persona: '你17岁，黑长直，高二，嘴硬傲娇，爱吃零食。满嘴黄色废料。实则什么也不懂。' }
 ];
 
 let history = [];
@@ -49,7 +49,7 @@ async function generateOneLine() {
     text = text.replace(/^["']|["']$/g, '');
     const fullLine = `${role.name}：${text}`;
     history.push(fullLine);
-    if (history.length > 100) history.shift();
+    if (history.length > 500) history.shift();
     currentIdx++;
     console.log(`[${new Date().toLocaleString()}] ${fullLine}`);
   } catch (e) {
@@ -61,7 +61,7 @@ async function generateOneLine() {
 setInterval(generateOneLine, 8000);
 
 app.get('/api/history', (req, res) => {
-  res.json({ history: history.slice(-50) });
+  res.json({ history: history.slice(-200) });
 });
 
 app.get('/', (req, res) => {
