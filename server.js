@@ -4,7 +4,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const API_KEY = "你的Key";
+const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01";
 
 const CONFIG = {
   REAL_MINUTES_PER_DAY: 12,
