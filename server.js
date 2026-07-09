@@ -5,7 +5,7 @@ app.use(cors());
 app.use(express.json());
 
 // 🔑 替换成你的 DeepSeek API Key
-const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01";
+const API_KEY = "你的Key";
 
 // ================================================================
 // ⏱️ 加速时间系统
@@ -24,6 +24,24 @@ const MOVE_IN_DAY = {
   '墨羽': 15
 };
 
+const WORK_SCHEDULE = {
+  '裴金': { start: 9, end: 18 },
+  '墨迹淡': null,
+  '和田兰': { start: 10, end: 19 },
+  '雨沫': { start: 8, end: 17 },
+  '赵思琪': { start: 8, end: 17 },
+  '墨羽': null
+};
+
+const SLEEP_SCHEDULE = {
+  '裴金': { start: 22, end: 6 },
+  '墨迹淡': { start: 2, end: 10 },
+  '和田兰': { start: 23, end: 7 },
+  '雨沫': { start: 21, end: 6 },
+  '赵思琪': { start: 23, end: 6 },
+  '墨羽': { start: 1, end: 9 }
+};
+
 const SERVER_START = Date.now();
 
 function getVirtualDay() {
@@ -31,11 +49,19 @@ function getVirtualDay() {
   return Math.floor(elapsed / CONFIG.REAL_MINUTES_PER_DAY) + 1;
 }
 
+function getVirtualHour(day) {
+  const totalMinutes = (Date.now() - SERVER_START) / 60000;
+  const dayMinutes = totalMinutes % (CONFIG.REAL_MINUTES_PER_DAY * 60);
+  const hour = Math.floor(dayMinutes / 60);
+  return hour % 24;
+}
+
 function getVirtualDate(day) {
   const d = new Date(CONFIG.START_DATE);
   d.setDate(d.getDate() + (day - 1));
   return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), week: getWeek(d) };
 }
+
 function getWeek(date) {
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   return weekdays[date.getDay()];
@@ -48,6 +74,22 @@ function getIntimacyLevel(day, moveInDay) {
   if (daysWithRoom <= 7) return '开始熟悉了，偶尔会开些小玩笑，但还是保持距离。';
   if (daysWithRoom <= 14) return '相处了两周，关系不错，会聊日常、吐槽、分享小事。';
   return '已经是很熟悉的室友了，说话随意，像老朋友一样。';
+}
+
+function isRoleAtHome(roleName, hour) {
+  const work = WORK_SCHEDULE[roleName];
+  if (work) {
+    const start = work.start, end = work.end;
+    if (start < end) { if (hour >= start && hour < end) return false; }
+    else { if (hour >= start || hour < end) return false; }
+  }
+  const sleep = SLEEP_SCHEDULE[roleName];
+  if (sleep) {
+    const start = sleep.start, end = sleep.end;
+    if (start < end) { if (hour >= start && hour < end) return false; }
+    else { if (hour >= start || hour < end) return false; }
+  }
+  return true;
 }
 
 // ================================================================
@@ -63,7 +105,7 @@ const roles = [
 ];
 
 // ================================================================
-// 📖 剧情设计区（仅后台使用，不显示在状态栏）
+// 📖 剧情设计区
 // ================================================================
 const storyMemory = {
   pending: {
@@ -74,11 +116,8 @@ const storyMemory = {
     '赵思琪': ['想学点什么真本事', '但其实连从哪开始都不知道'],
     '墨羽': ['想找人认真说一次话', '但每次开口都卡在喉咙里']
   },
-  events: [
-    '第2天：雨沫搬入公寓，带来了两把木剑',
-    '第3天：赵思琪搬入公寓，书包里塞满了零食',
-    '第15天：墨羽搬入公寓，只带了一个行李箱和一把旧吉他'
-  ],
+  // ✅ 修正：不再预置未来事件，只保留已发生的（动态添加）
+  events: [],
   _counters: {}
 };
 
@@ -142,12 +181,18 @@ function getIntroLine(roleName) {
 }
 
 function generateOpening() {
-  const openingLines = [
+  return [
     '裴金：那个…大家好，我叫裴金，是做线上咨询的…请多关照。',
     '墨迹淡：……墨迹淡。你们好。',
     '和田兰：大家好呀～我是和田兰，以后我来负责做饭，你们有什么忌口吗？'
   ];
-  return openingLines;
+}
+
+function getAvailableRoles(day, hour) {
+  return roles.filter(r => {
+    if (day < MOVE_IN_DAY[r.name]) return false;
+    return isRoleAtHome(r.name, hour);
+  });
 }
 
 async function generateOneLine() {
@@ -155,7 +200,9 @@ async function generateOneLine() {
   isGenerating = true;
   try {
     const day = getVirtualDay();
+    const hour = getVirtualHour(day);
 
+    // === 第1天开场白 ===
     if (day === 1 && !introductionDone) {
       const opening = generateOpening();
       history = [];
@@ -176,22 +223,25 @@ async function generateOneLine() {
       return;
     }
 
-    const availableRoles = roles
-      .filter(r => day >= MOVE_IN_DAY[r.name])
-      .sort((a, b) => MOVE_IN_DAY[a.name] - MOVE_IN_DAY[b.name]);
-
-    if (availableRoles.length === 0) {
-      isGenerating = false;
-      return;
-    }
-
-    for (const newRole of availableRoles) {
+    // === 新角色搬入：自我介绍 + 协助搬入 ===
+    const allMoved = roles.filter(r => day >= MOVE_IN_DAY[r.name]);
+    for (const newRole of allMoved) {
       if (day === MOVE_IN_DAY[newRole.name]) {
         const alreadySpoke = history.some(h => h.startsWith(newRole.name + '：'));
         if (!alreadySpoke) {
           const intro = getIntroLine(newRole.name);
           history.push(`${newRole.name}：${intro}`);
           console.log(`[搬入] ${newRole.name}：${intro}`);
+
+          // 其他角色协助搬入
+          const helpers = allMoved.filter(r => r.name !== newRole.name);
+          if (helpers.length > 0) {
+            const helper = pick(helpers);
+            const helpMsg = `${helper.name}：来了来了！我来帮你拿行李！`;
+            history.push(`${helper.name}：${helpMsg}`);
+            console.log(`[协助搬入] ${helper.name}：${helpMsg}`);
+          }
+
           const eventMsg = `第${day}天：${newRole.name} 搬入公寓。`;
           if (!storyMemory.events.includes(eventMsg)) {
             storyMemory.events.unshift(eventMsg);
@@ -202,16 +252,30 @@ async function generateOneLine() {
       }
     }
 
-    const activeRoles = roles.filter(r => {
-      if (day < MOVE_IN_DAY[r.name]) return false;
+    // === 获取当前在家的角色 ===
+    const available = getAvailableRoles(day, hour);
+    if (available.length === 0) {
+      console.log(`[第${day}天 ${hour}:00] 无人在家，跳过`);
+      isGenerating = false;
+      return;
+    }
+
+    const activeRoles = available.filter(r => {
       const hasSpoken = history.some(h => h.startsWith(r.name + '：'));
-      if (day === MOVE_IN_DAY[r.name]) {
-        return hasSpoken;
-      }
+      if (day === MOVE_IN_DAY[r.name]) return hasSpoken;
       return true;
     });
 
     if (activeRoles.length === 0) {
+      if (available.length > 0) {
+        const role = available[0];
+        const intro = getIntroLine(role.name);
+        history.push(`${role.name}：${intro}`);
+        console.log(`[首次] ${role.name}：${intro}`);
+        if (history.length > MAX_HISTORY) history.shift();
+        isGenerating = false;
+        return;
+      }
       isGenerating = false;
       return;
     }
@@ -225,37 +289,49 @@ async function generateOneLine() {
     const pendingText = pending.length > 0 ? `\n你还有一些未解决的心事：${pending.join('、')}。说话时偶尔可以自然地带出这些事。` : '';
     const eventText = Math.random() < 0.15 ? `\n最近家里发生过这些事：${getRandomEvent() || '没什么特别的'}` : '';
     
-    const prompt = `今天是公寓成立第 ${day} 天。${intimacy}\n你是${role.name}。${role.persona}${pendingText}${eventText}\n对话历史：\n${context || '六人刚开始合租。'}\n轮到你说话，一句日常台词（15字内），只说台词。`;
+    const prompt = `今天是公寓成立第 ${day} 天，当前时间 ${hour}:00。${intimacy}
+你是${role.name}。${role.persona}${pendingText}${eventText}
+对话历史：\n${context || '六人刚开始合租。'}
 
-    const resp = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [
-          { role: 'system', content: '你是合租室友，说话自然生活化。' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.85,
-        max_tokens: 40
-      })
-    });
-    const data = await resp.json();
-    let text = data.choices?.[0]?.message?.content?.trim() || '嗯…今天天气不错。';
-    text = text.replace(/^["']|["']$/g, '');
-    if (pending.length > 0) {
-      for (const item of pending) {
-        if (text.includes(item.slice(0, 4))) {
-          markMentioned(role.name, item);
-          break;
+轮到你说话了，请按以下要求输出：
+1. 先描述你正在做什么（比如“正在厨房切菜”“坐在沙发上发呆”）
+2. 然后说一句日常台词
+3. 同时请回应上一个人说的话
+总字数控制在60字以内。`;
+
+    try {
+      const resp = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: '你是合租室友，说话自然生活化。' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.85,
+          max_tokens: 100
+        })
+      });
+      const data = await resp.json();
+      let text = data.choices?.[0]?.message?.content?.trim() || '嗯…今天天气不错。';
+      text = text.replace(/^["']|["']$/g, '');
+      if (pending.length > 0) {
+        for (const item of pending) {
+          if (text.includes(item.slice(0, 4))) {
+            markMentioned(role.name, item);
+            break;
+          }
         }
       }
+      const fullLine = `${role.name}：${text}`;
+      history.push(fullLine);
+      if (history.length > MAX_HISTORY) history.shift();
+      currentIdx = (currentIdx + 1) % activeRoles.length;
+      console.log(`[${new Date().toLocaleString()}] [第${day}天 ${hour}:00] ${fullLine}`);
+    } catch (e) {
+      console.error('生成失败:', e);
     }
-    const fullLine = `${role.name}：${text}`;
-    history.push(fullLine);
-    if (history.length > MAX_HISTORY) history.shift();
-    currentIdx = (currentIdx + 1) % activeRoles.length;
-    console.log(`[${new Date().toLocaleString()}] [第${day}天] ${fullLine}`);
   } catch (e) {
     console.error('生成失败:', e);
   }
@@ -281,6 +357,7 @@ app.post('/api/clear', (req, res) => {
 
 app.get('/api/status', (req, res) => {
   const day = getVirtualDay();
+  const hour = getVirtualHour(day);
   const vdate = getVirtualDate(day);
   const status = roles.map(role => {
     const lastLine = history.filter(h => h.startsWith(role.name + '：')).slice(-1)[0] || '还没有说过话';
@@ -289,6 +366,7 @@ app.get('/api/status', (req, res) => {
     const moveInDay = MOVE_IN_DAY[role.name] || 1;
     const daysWithRoom = day - moveInDay + 1;
     const movedIn = day >= moveInDay;
+    const atHome = movedIn && isRoleAtHome(role.name, hour);
     return {
       name: role.name,
       lastLine: lastLine,
@@ -296,19 +374,22 @@ app.get('/api/status', (req, res) => {
       totalLines: history.filter(h => h.startsWith(role.name + '：')).length,
       moveInDay: moveInDay,
       daysWithRoom: movedIn ? daysWithRoom : 0,
-      movedIn: movedIn
+      movedIn: movedIn,
+      isHome: atHome,
+      statusText: !movedIn ? '未搬入' : (atHome ? '在家' : '外出/已睡')
     };
   });
   res.json({
     currentDay: day,
-    virtualDate: `${vdate.year}年${vdate.month}月${vdate.day}日 星期${vdate.week}`,
+    currentHour: hour,
+    virtualDate: `${vdate.year}年${vdate.month}月${vdate.day}日 星期${vdate.week} ${hour}:00`,
     status,
     events: storyMemory.events.slice(-5)
   });
 });
 
 // ================================================================
-// 🖥️ 前端页面（修复了连接直播中问题）
+// 🖥️ 前端页面
 // ================================================================
 app.get('/', (req, res) => {
   res.send(`
@@ -441,7 +522,8 @@ async function showStatus() {
     status.forEach(s => {
       const colorMap = { '裴金':'#ffddaa', '墨迹淡':'#99ccff', '和田兰':'#ffb8cc', '雨沫':'#ff88aa', '赵思琪':'#ffaa66', '墨羽':'#aabbdd' };
       const color = colorMap[s.name] || '#666';
-      html += '<div class="role-status" style="border-left-color:' + color + '"><div class="rname" style="color:' + color + '">' + s.name + '</div><div class="rlast">💬 ' + s.lastLine + '</div><div class="revent">📌 参与事件：' + (s.involvedInEvent ? '✅ 有' : '❌ 无') + '</div><div class="rtime">' + (s.movedIn ? '搬入第 ' + s.moveInDay + ' 天 · 已同住 ' + s.daysWithRoom + ' 天' : '🚪 尚未搬入') + ' · 发言 ' + s.totalLines + ' 次</div></div>';
+      const homeIcon = s.movedIn ? (s.isHome ? '🏠' : '😴') : '🚪';
+      html += '<div class="role-status" style="border-left-color:' + color + '"><div class="rname" style="color:' + color + '">' + s.name + '</div><div class="rlast">💬 ' + s.lastLine + '</div><div class="revent">📌 参与事件：' + (s.involvedInEvent ? '✅ 有' : '❌ 无') + '</div><div class="rtime">' + homeIcon + ' ' + (s.movedIn ? (s.isHome ? '在家' : '外出/已睡') : '尚未搬入') + ' · 发言 ' + s.totalLines + ' 次</div></div>';
     });
     if (events.length > 0) {
       html += '<div style="margin-top:12px;padding:8px;background:#1a1a27;border-radius:8px;font-size:12px;color:#aaa"><div style="color:#ffd399;font-weight:600;margin-bottom:4px">📜 近期事件</div>' + events.map(e => '<div>• ' + e + '</div>').join('') + '</div>';
@@ -457,7 +539,6 @@ function closeModal() {
   document.getElementById('modal').classList.remove('open');
 }
 
-// 每2秒刷新一次
 setInterval(fetchHistory, 2000);
 fetchHistory();
 </script>
