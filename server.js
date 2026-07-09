@@ -8,6 +8,48 @@ app.use(express.json());
 const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01";
 
 // ================================================================
+// ⏱️ 加速时间系统
+// ================================================================
+const CONFIG = {
+  REAL_MINUTES_PER_DAY: 12,
+  START_DATE: new Date(2024, 0, 1),
+};
+
+const MOVE_IN_DAY = {
+  '裴金': 1,
+  '墨迹淡': 1,
+  '和田兰': 1,
+  '雨沫': 2,
+  '赵思琪': 3,
+  '墨羽': 15
+};
+
+const SERVER_START = Date.now();
+
+function getVirtualDay() {
+  const elapsed = (Date.now() - SERVER_START) / 60000;
+  return Math.floor(elapsed / CONFIG.REAL_MINUTES_PER_DAY) + 1;
+}
+
+function getVirtualDate(day) {
+  const d = new Date(CONFIG.START_DATE);
+  d.setDate(d.getDate() + (day - 1));
+  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), week: getWeek(d) };
+}
+function getWeek(date) {
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  return weekdays[date.getDay()];
+}
+
+function getIntimacyLevel(day, moveInDay) {
+  const daysWithRoom = day - moveInDay + 1;
+  if (daysWithRoom <= 3) return '刚搬进来，彼此很客气，说话礼貌谨慎。';
+  if (daysWithRoom <= 7) return '开始熟悉了，偶尔会开些小玩笑，但还是保持距离。';
+  if (daysWithRoom <= 14) return '相处了两周，关系不错，会聊日常、吐槽、分享小事。';
+  return '已经是很熟悉的室友了，说话随意，像老朋友一样。';
+}
+
+// ================================================================
 // 👥 角色设定
 // ================================================================
 const roles = [
@@ -20,7 +62,7 @@ const roles = [
 ];
 
 // ================================================================
-// 📖 剧情设计区 —— 在这里自定义剧情走向
+// 📖 剧情设计区（仅后台使用，不显示在状态栏）
 // ================================================================
 const storyMemory = {
   pending: {
@@ -31,13 +73,6 @@ const storyMemory = {
     '赵思琪': ['想学点什么真本事', '但其实连从哪开始都不知道'],
     '墨羽': ['想找人认真说一次话', '但每次开口都卡在喉咙里']
   },
-  relationships: {
-    '裴金-和田兰': '极度依赖，把对方当姐姐',
-    '墨迹淡-和田兰': '直觉上有点警惕',
-    '赵思琪-墨迹淡': '一直挑衅但每次都被"嗯"打败',
-    '雨沫-和田兰': '本能觉得和田兰危险（7分）',
-    '墨羽-所有人': '在努力记住每个人的名字'
-  },
   events: [
     '第2天：裴金半夜在厨房哭，被墨羽看到了',
     '第4天：赵思琪说要组局，结果只买了三包薯片',
@@ -47,7 +82,6 @@ const storyMemory = {
   _counters: {}
 };
 
-// 初始化计数器
 for (const name in storyMemory.pending) {
   storyMemory._counters[name] = {};
   storyMemory.pending[name].forEach(item => {
@@ -61,6 +95,11 @@ for (const name in storyMemory.pending) {
 let history = [];
 let currentIdx = 0;
 let isGenerating = false;
+
+// 服务器存储上限 300 条
+const MAX_HISTORY = 300;
+// 前端显示 200 条
+const FRONTEND_DISPLAY = 200;
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -80,7 +119,7 @@ function markMentioned(name, item) {
     const idx = storyMemory.pending[name].indexOf(item);
     if (idx !== -1) storyMemory.pending[name].splice(idx, 1);
     console.log(`✅ 剧情推进：${name} 的「${item}」已解决！`);
-    const newEvent = `${new Date().toLocaleDateString()}：${name} 终于放下了「${item}」这件事。`;
+    const newEvent = `${getVirtualDate(getVirtualDay()).year}年${getVirtualDate(getVirtualDay()).month}月${getVirtualDate(getVirtualDay()).day}日：${name} 放下了「${item}」这件事。`;
     storyMemory.events.push(newEvent);
     if (storyMemory.events.length > 20) storyMemory.events.shift();
   }
@@ -95,19 +134,21 @@ async function generateOneLine() {
   if (isGenerating) return;
   isGenerating = true;
   try {
+    const day = getVirtualDay();
     const role = roles[currentIdx % roles.length];
+    const moveInDay = MOVE_IN_DAY[role.name] || 1;
+    const intimacy = getIntimacyLevel(day, moveInDay);
+    
     const context = history.slice(-6).join('\n');
     const pending = getPendingFor(role.name);
     const pendingText = pending.length > 0 ? `\n你还有一些未解决的心事：${pending.join('、')}。说话时偶尔可以自然地带出这些事。` : '';
     const eventText = Math.random() < 0.15 ? `\n最近家里发生过这些事：${getRandomEvent() || '没什么特别的'}` : '';
-    const prompt = `你是${role.name}。${role.persona}${pendingText}${eventText}\n对话历史：\n${context || '六人刚开始合租。'}\n轮到你说话，一句日常台词（30字内），只说台词。`;
+    
+    const prompt = `今天是公寓成立第 ${day} 天。${intimacy}\n你是${role.name}。${role.persona}${pendingText}${eventText}\n对话历史：\n${context || '六人刚开始合租。'}\n轮到你说话，一句日常台词（15字内），只说台词。`;
 
     const resp = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [
@@ -131,9 +172,10 @@ async function generateOneLine() {
     }
     const fullLine = `${role.name}：${text}`;
     history.push(fullLine);
-    if (history.length > 500) history.shift();
+    // 服务器存储上限 300 条
+    if (history.length > MAX_HISTORY) history.shift();
     currentIdx++;
-    console.log(`[${new Date().toLocaleString()}] ${fullLine}`);
+    console.log(`[${new Date().toLocaleString()}] [第${day}天] ${fullLine}`);
   } catch (e) {
     console.error('生成失败:', e);
   }
@@ -146,7 +188,8 @@ setInterval(generateOneLine, 8000);
 // 🌐 API 路由
 // ================================================================
 app.get('/api/history', (req, res) => {
-  res.json({ history: history.slice(-200) });
+  // 前端显示最近 200 条
+  res.json({ history: history.slice(-FRONTEND_DISPLAY) });
 });
 
 app.post('/api/clear', (req, res) => {
@@ -156,21 +199,31 @@ app.post('/api/clear', (req, res) => {
   res.json({ status: 'cleared' });
 });
 
+// ✅ 状态 API（已移除 pending，只显示事实）
 app.get('/api/status', (req, res) => {
+  const day = getVirtualDay();
+  const vdate = getVirtualDate(day);
   const status = roles.map(role => {
     const lastLine = history.filter(h => h.startsWith(role.name + '：')).slice(-1)[0] || '还没有说过话';
-    const pending = getPendingFor(role.name);
     const recentEvents = storyMemory.events.slice(-5);
     const involvedInEvent = recentEvents.some(e => e.includes(role.name));
+    const moveInDay = MOVE_IN_DAY[role.name] || 1;
+    const daysWithRoom = day - moveInDay + 1;
     return {
       name: role.name,
       lastLine: lastLine,
-      pending: pending,
       involvedInEvent: involvedInEvent,
-      totalLines: history.filter(h => h.startsWith(role.name + '：')).length
+      totalLines: history.filter(h => h.startsWith(role.name + '：')).length,
+      moveInDay: moveInDay,
+      daysWithRoom: daysWithRoom
     };
   });
-  res.json({ status, events: storyMemory.events.slice(-5) });
+  res.json({
+    currentDay: day,
+    virtualDate: `${vdate.year}年${vdate.month}月${vdate.day}日 星期${vdate.week}`,
+    status,
+    events: storyMemory.events.slice(-5)
+  });
 });
 
 // ================================================================
@@ -214,8 +267,9 @@ body{background:#1a1a27;color:#f0f0f0;padding:15px;display:flex;justify-content:
 .role-status{background:#1a1a27;border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid #666}
 .role-status .rname{font-weight:600;font-size:14px}
 .role-status .rlast{font-size:12px;color:#aaa;margin:4px 0}
-.role-status .rpending{font-size:11px;color:#ffaa66}
 .role-status .revent{font-size:11px;color:#66bbff}
+.role-status .rtime{font-size:10px;color:#666;margin-top:2px}
+.time-display{text-align:center;font-size:14px;color:#ffd399;margin-bottom:12px;background:#1a1a27;padding:6px;border-radius:8px;border:1px solid #333}
 </style>
 </head>
 <body>
@@ -244,7 +298,7 @@ let lastLength=0;const story=document.getElementById('story');const count=docume
 async function fetchHistory(){try{const res=await fetch('/api/history');const data=await res.json();const lines=data.history||[];count.textContent=lines.length;if(lines.length===lastLength&&lines.length>0)return;lastLength=lines.length;story.innerHTML='';if(lines.length===0){story.innerHTML='<div class="empty-state">📭 聊天记录已清空，等待新对话...</div>';return}
 lines.forEach(line=>{const colonIdx=line.indexOf('：');if(colonIdx===-1)return;const name=line.slice(0,colonIdx);const content=line.slice(colonIdx+1);const clsMap={'裴金':'pei','墨迹淡':'moji','和田兰':'hetian','雨沫':'yumo','赵思琪':'siqi','墨羽':'moyu'};const cls=clsMap[name]||'';const div=document.createElement('div');div.className='line '+cls;div.innerHTML='<div class="action">'+name+'</div>'+content;story.appendChild(div)});story.scrollTop=story.scrollHeight}catch(e){console.error(e)}}
 async function clearHistory(){if(!confirm('确定要清空所有聊天记录吗？此操作不可撤销。'))return;try{const res=await fetch('/api/clear',{method:'POST'});if(res.ok){lastLength=0;story.innerHTML='<div class="empty-state">🗑️ 已清空，重新生成中...</div>';count.textContent='0';setTimeout(fetchHistory,2000)}else{alert('清空失败，请重试')}}catch(e){alert('网络错误，请检查连接')}}
-async function showStatus(){try{const res=await fetch('/api/status');const data=await res.json();const status=data.status||[];const events=data.events||[];let html='';status.forEach(s=>{const colorMap={'裴金':'#ffddaa','墨迹淡':'#99ccff','和田兰':'#ffb8cc','雨沫':'#ff88aa','赵思琪':'#ffaa66','墨羽':'#aabbdd'};const color=colorMap[s.name]||'#666';html+='<div class="role-status" style="border-left-color:'+color+'"><div class="rname" style="color:'+color+'">'+s.name+'</div><div class="rlast">💬 '+s.lastLine+'</div><div class="rpending">💭 未解决：'+(s.pending.length>0?s.pending.join('、'):'无')+'</div><div class="revent">📌 参与事件：'+(s.involvedInEvent?'✅ 有':'❌ 无')+'</div><div style="font-size:10px;color:#666;margin-top:2px">发言 '+s.totalLines+' 次</div></div>'});if(events.length>0){html+='<div style="margin-top:12px;padding:8px;background:#1a1a27;border-radius:8px;font-size:12px;color:#aaa"><div style="color:#ffd399;font-weight:600;margin-bottom:4px">📜 近期事件</div>'+events.map(e=>'<div>• '+e+'</div>').join('')+'</div>'}document.getElementById('statusContent').innerHTML=html;document.getElementById('modal').classList.add('open')}catch(e){alert('获取状态失败')}}
+async function showStatus(){try{const res=await fetch('/api/status');const data=await res.json();const status=data.status||[];const events=data.events||[];const currentDay=data.currentDay||0;const virtualDate=data.virtualDate||'';let html='<div class="time-display">🏠 公寓第 '+currentDay+' 天  ('+virtualDate+')</div>';status.forEach(s=>{const colorMap={'裴金':'#ffddaa','墨迹淡':'#99ccff','和田兰':'#ffb8cc','雨沫':'#ff88aa','赵思琪':'#ffaa66','墨羽':'#aabbdd'};const color=colorMap[s.name]||'#666';html+='<div class="role-status" style="border-left-color:'+color+'"><div class="rname" style="color:'+color+'">'+s.name+'</div><div class="rlast">💬 '+s.lastLine+'</div><div class="revent">📌 参与事件：'+(s.involvedInEvent?'✅ 有':'❌ 无')+'</div><div class="rtime">搬入第 '+s.moveInDay+' 天 · 已同住 '+s.daysWithRoom+' 天 · 发言 '+s.totalLines+' 次</div></div>'});if(events.length>0){html+='<div style="margin-top:12px;padding:8px;background:#1a1a27;border-radius:8px;font-size:12px;color:#aaa"><div style="color:#ffd399;font-weight:600;margin-bottom:4px">📜 近期事件</div>'+events.map(e=>'<div>• '+e+'</div>').join('')+'</div>'}document.getElementById('statusContent').innerHTML=html;document.getElementById('modal').classList.add('open')}catch(e){alert('获取状态失败')}}
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 setInterval(fetchHistory,2000);fetchHistory();
 </script>
