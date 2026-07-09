@@ -4,7 +4,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const API_KEY = "你的Key"; // 🔑 替换成真实 Key
+const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01"; // 🔑 替换成真实 Key
 
 // ================================================================
 // 时间系统
