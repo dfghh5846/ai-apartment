@@ -296,7 +296,7 @@ async function generateOneLine() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
         body: JSON.stringify({
-          model: 'deepseek-chat',
+          model: 'deepseek-v4-flash',
           messages: [
             { role: 'system', content: '你是合租室友，说话自然生活化。' },
             { role: 'user', content: prompt }
