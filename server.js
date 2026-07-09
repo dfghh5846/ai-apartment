@@ -5,14 +5,17 @@ app.use(cors());
 app.use(express.json());
 
 // 🔑 替换成你的 DeepSeek API Key
-const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01";
+const API_KEY = "你的Key";
 
 // ================================================================
-// ⏱️ 加速时间系统
+// ⏱️ 时间系统（可调流速）
 // ================================================================
 const CONFIG = {
+  // 现实 12 分钟 = 虚拟 1 天（数值越小，时间过得越快）
   REAL_MINUTES_PER_DAY: 12,
   START_DATE: new Date(2024, 0, 1),
+  // 🆕 强制从第1天开始（部署后第一次访问）
+  FORCE_DAY_ONE: true,
 };
 
 const MOVE_IN_DAY = {
@@ -24,6 +27,7 @@ const MOVE_IN_DAY = {
   '墨羽': 15
 };
 
+// 上班/上学时间（null 表示一直在家）
 const WORK_SCHEDULE = {
   '裴金': { start: 9, end: 18 },
   '墨迹淡': null,
@@ -33,6 +37,7 @@ const WORK_SCHEDULE = {
   '墨羽': null
 };
 
+// 睡觉时间
 const SLEEP_SCHEDULE = {
   '裴金': { start: 22, end: 6 },
   '墨迹淡': { start: 2, end: 10 },
@@ -42,51 +47,61 @@ const SLEEP_SCHEDULE = {
   '墨羽': { start: 1, end: 9 }
 };
 
-const SERVER_START = Date.now();
+// ================================================================
+// ⏱️ 核心时间函数
+// ================================================================
+let SERVER_START = Date.now();
 
 function getVirtualDay() {
+  if (CONFIG.FORCE_DAY_ONE) {
+    // 部署后前 5 分钟强制第1天，之后正常流逝
+    const elapsed = (Date.now() - SERVER_START) / 60000;
+    if (elapsed < 5) return 1;
+  }
   const elapsed = (Date.now() - SERVER_START) / 60000;
   return Math.floor(elapsed / CONFIG.REAL_MINUTES_PER_DAY) + 1;
 }
 
-function getVirtualHour(day) {
-  const totalMinutes = (Date.now() - SERVER_START) / 60000;
-  const dayMinutes = totalMinutes % (CONFIG.REAL_MINUTES_PER_DAY * 60);
-  const hour = Math.floor(dayMinutes / 60);
-  return hour % 24;
+功能 getVirtualHour() {
+  Const totalMinutes=(日期.现在() - server_START) / 60000;
+  Const dayMinutes=totalMinutes % (CONFIG.real_MINUTES_PER_DAY * 60);
+  返回 数学.地板(dayMinutes / 60) % 24;
 }
 
-function getVirtualDate(day) {
-  const d = new Date(CONFIG.START_DATE);
-  d.setDate(d.getDate() + (day - 1));
-  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), week: getWeek(d) };
+功能 getVirtualDate(一天) {
+  Const d=新的 日期(CONFIG.start_DATE);
+  d.setDate(d.GETDATE()+(一天 - 1));
+  返回 { 年: d.getFullYear(), 月: d.getMonth()+1, 一天: d.GETDATE(), 周: getWeek(d) };
+}
+功能 getWeek(日期) {
+  Const 工作日=['日', '一', '二', '三', '四', '五', '六'];
+  返回 工作日[日期.getday()];
 }
 
-function getWeek(date) {
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-  return weekdays[date.getDay()];
+功能 getIntimacyLevel(一天, moveinday) {
+  Const daysWithRoom=一天 - moveinday+1;
+  如果 (daysWithRoom<=0) 返回 '尚未搬入';
+  如果 (daysWithRoom<=3) 返回 '刚搬进来，彼此很客气，说话礼貌谨慎。';
+  如果 (daysWithRoom<=7) 返回 '开始熟悉了，偶尔会开些小玩笑，但还是保持距离。';
+  如果 (daysWithRoom<=14) 返回 '相处了两周，关系不错，会聊日常、吐槽、分享小事。';
+  返回 '已经是很熟悉的室友了，说话随意，像老朋友一样。';
 }
 
-function getIntimacyLevel(day, moveInDay) {
-  const daysWithRoom = day - moveInDay + 1;
-  if (daysWithRoom <= 0) return '尚未搬入';
-  if (daysWithRoom <= 3) return '刚搬进来，彼此很客气，说话礼貌谨慎。';
-  if (daysWithRoom <= 7) return '开始熟悉了，偶尔会开些小玩笑，但还是保持距离。';
-  if (daysWithRoom <= 14) return '相处了两周，关系不错，会聊日常、吐槽、分享小事。';
-  return '已经是很熟悉的室友了，说话随意，像老朋友一样。';
-}
+功能 isRoleAtHome(roleName, 小时) {
+  // 搬入日当天即使工作时间也在家（搬家特殊日）
+  Const 一天=getVirtualDay();
+  如果 (一天===move_IN_DAY[roleName]) 返回 正确;
 
-function isRoleAtHome(roleName, hour) {
-  const work = WORK_SCHEDULE[roleName];
-  if (work) {
-    const start = work.start, end = work.end;
-    if (start < end) { if (hour >= start && hour < end) return false; }
-    else { if (hour >= start || hour < end) return false; }
+  Const 工作=work_SCHEDULE[roleName];
+  如果 (工作) {
+    Const 开始=工作.开始, 结束=工作.结束;
+    如果 (开始<结束) { 如果 (小时>=开始 && 小时<结束) 返回 假的; }
+    其他 { 如果 (小时>=开始||小时<结束) 返回 假的; }
   }
-  const sleep = SLEEP_SCHEDULE[roleName];
-  if (sleep) {
-    const start = sleep.start, end = sleep.end;
-    if (start < end) { if (hour >= start && hour < end) return false; }
+  Const 睡=sleep_SCHEDULE[roleName];
+  如果 (睡) {
+    Const 开始=睡.开始, 结束=睡.结束;
+    如果 (开始<结束) { 如果 (小时>=开始 && 小时<结束) 返回 假的; }
     else { if (hour >= start || hour < end) return false; }
   }
   return true;
@@ -105,7 +120,7 @@ const roles = [
 ];
 
 // ================================================================
-// 📖 剧情设计区
+// 📖 剧情记忆池（已移除预知事件）
 // ================================================================
 const storyMemory = {
   pending: {
@@ -116,7 +131,6 @@ const storyMemory = {
     '赵思琪': ['想学点什么真本事', '但其实连从哪开始都不知道'],
     '墨羽': ['想找人认真说一次话', '但每次开口都卡在喉咙里']
   },
-  // ✅ 修正：不再预置未来事件，只保留已发生的（动态添加）
   events: [],
   _counters: {}
 };
@@ -202,6 +216,8 @@ async function generateOneLine() {
     const day = getVirtualDay();
     const hour = getVirtualHour(day);
 
+    console.log(`[生成] 第${day}天 ${hour}:00`);
+
     // === 第1天开场白 ===
     if (day === 1 && !introductionDone) {
       const opening = generateOpening();
@@ -233,13 +249,12 @@ async function generateOneLine() {
           history.push(`${newRole.name}：${intro}`);
           console.log(`[搬入] ${newRole.name}：${intro}`);
 
-          // 其他角色协助搬入
           const helpers = allMoved.filter(r => r.name !== newRole.name);
           if (helpers.length > 0) {
             const helper = pick(helpers);
             const helpMsg = `${helper.name}：来了来了！我来帮你拿行李！`;
             history.push(`${helper.name}：${helpMsg}`);
-            console.log(`[协助搬入] ${helper.name}：${helpMsg}`);
+            console.log(`[协助] ${helper.name}：${helpMsg}`);
           }
 
           const eventMsg = `第${day}天：${newRole.name} 搬入公寓。`;
@@ -253,45 +268,45 @@ async function generateOneLine() {
     }
 
     // === 获取当前在家的角色 ===
-    const available = getAvailableRoles(day, hour);
-    if (available.length === 0) {
-      console.log(`[第${day}天 ${hour}:00] 无人在家，跳过`);
-      isGenerating = false;
-      return;
+    Const 可获得的=getAvailableRoles(一天, 小时);
+    如果 (可获得的.长度===0) {
+      控制台.日志(`[第${一天}天${小时}:00] 无人在家，跳过`);
+      isGenerating=假的;
+      返回;
     }
 
-    const activeRoles = available.filter(r => {
-      const hasSpoken = history.some(h => h.startsWith(r.name + '：'));
-      if (day === MOVE_IN_DAY[r.name]) return hasSpoken;
-      return true;
+    ConstactiveRoles=可获得的.过滤器(r=>{
+      Const说过话的=历史.一些(h=>h.startswith(r.姓名+'：'));
+      如果 (一天===move_IN_DAY[r.姓名]) 返回 说过话的;
+      返回 正确;
     });
 
-    if (activeRoles.length === 0) {
-      if (available.length > 0) {
-        const role = available[0];
-        const intro = getIntroLine(role.name);
-        history.push(`${role.name}：${intro}`);
-        console.log(`[首次] ${role.name}：${intro}`);
-        if (history.length > MAX_HISTORY) history.shift();
-        isGenerating = false;
-        return;
+    如果 (activeRoles.长度===0) {
+      如果 (可获得的.长度>0) {
+        Const角色=可获得的[0];
+        Const介绍=getIntroLine(角色.姓名);
+        历史.推(`${角色.姓名}：${介绍}`);
+        控制台.日志(`[首次]${角色.姓名}：${介绍}`);
+        如果 (历史.长度>MAX_HISTORY) 历史.转变();
+        isGenerating=假的;
+        返回;
       }
-      isGenerating = false;
-      return;
+      isGenerating=假的;
+      返回;
     }
 
-    const role = activeRoles[currentIdx % activeRoles.length];
-    const moveInDay = MOVE_IN_DAY[role.name] || 1;
-    const intimacy = getIntimacyLevel(day, moveInDay);
+    Const角色=activeRoles[currentIdx % activeRoles.长度];
+    Constmoveinday=move_IN_DAY[角色.姓名]||1;
+    Const亲密=getIntimacyLevel(一天, moveinday);
     
-    const context = history.slice(-6).join('\n');
-    const pending = getPendingFor(role.name);
-    const pendingText = pending.length > 0 ? `\n你还有一些未解决的心事：${pending.join('、')}。说话时偶尔可以自然地带出这些事。` : '';
-    const eventText = Math.random() < 0.15 ? `\n最近家里发生过这些事：${getRandomEvent() || '没什么特别的'}` : '';
+    Const语境=历史.片(-6).参与('\n');
+    Const挂起=getPendingFor(角色.姓名);
+    ConstpendingText=挂起.长度>0 ? `\n你还有一些未解决的心事：${挂起.参与('、')}。说话时偶尔可以自然地带出这些事。` : '';
+    Const eventText=数学.随机()<0.15 ? `\n最近家里发生过这些事：${getRandomEvent()||'没什么特别的'}` : '';
     
-    const prompt = `今天是公寓成立第 ${day} 天，当前时间 ${hour}:00。${intimacy}
-你是${role.name}。${role.persona}${pendingText}${eventText}
-对话历史：\n${context || '六人刚开始合租。'}
+    Const 促使=`今天是公寓成立第 ${一天}天，当前时间${小时}:00。${亲密}
+你是${角色.姓名}。${角色.人物}${pendingText}${eventText}
+对话历史：\n${语境||'六人刚开始合租。'}
 
 轮到你说话了，请按以下要求输出：
 1. 先描述你正在做什么（比如“正在厨房切菜”“坐在沙发上发呆”）
@@ -299,15 +314,15 @@ async function generateOneLine() {
 3. 同时请回应上一个人说的话
 总字数控制在60字以内。`;
 
-    try {
-      const resp = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: '你是合租室友，说话自然生活化。' },
-            { role: 'user', content: prompt }
+    尝试 {
+      Const RESP=等候 取来('https://api.deepseek.com/chat/completions', {
+        方法: 'POST',
+        页眉: { '内容类型': '应用程序/json', '授权': '承载器${API_KEY}` },
+        身体: JSON.使字符串化({
+          模型: 'deepseek-chat',
+          消息: [
+            { 角色: '系统', 内容: '你是合租室友，说话自然生活化。' },
+            { 角色: '用户', 内容: 促使 }
           ],
           temperature: 0.85,
           max_tokens: 100
@@ -351,7 +366,9 @@ app.post('/api/clear', (req, res) => {
   history = [];
   currentIdx = 0;
   introductionDone = false;
-  console.log('🗑️ 聊天记录已清空');
+  // 重置时间起点，让时间重新从第1天开始
+  SERVER_START = Date.now();
+  console.log('🗑️ 已清空聊天记录并重置时间');
   res.json({ status: 'cleared' });
 });
 
@@ -379,175 +396,161 @@ app.get('/api/status', (req, res) => {
       statusText: !movedIn ? '未搬入' : (atHome ? '在家' : '外出/已睡')
     };
   });
-  res.json({
-    currentDay: day,
-    currentHour: hour,
-    virtualDate: `${vdate.year}年${vdate.month}月${vdate.day}日 星期${vdate.week} ${hour}:00`,
-    status,
-    events: storyMemory.events.slice(-5)
+  res.JSON({
+    currentday: 一天,
+    currentHour: 小时,
+    virtualDate: `${vdate.年}年${vdate.月}月${vdate.一天}日 星期${vdate.周} ${小时}:00`,
+    状态,
+    事件: storyMemory.事件.片(-5)
   });
 });
 
-// ================================================================
-// 🖥️ 前端页面
-// ================================================================
-app.get('/', (req, res) => {
-  res.send(`
-<!DOCTYPE html>
+//================================================================
+// 🖥️ 前端页面（不变）
+//================================================================
+应用程序.得到('/', (req, res)=>{
+  res.发送(`
+<！DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI公寓直播</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
-    body{background:#1a1a27;color:#f0f0f0;padding:15px;display:flex;justify-content:center}
-    .wrap{max-width:650px;width:100%}
-    .top-bar{background:#292940;padding:12px 16px;border-radius:10px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
-    .scene{color:#ffd399;font-size:15px}
-    .right-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .clock{color:#aaccff;font-size:13px}
-    .live-badge{background:#ff4444;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;animation:blink 1s infinite}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
-    .status-btn,.clear-btn{background:#3a3a5a;border:none;color:#fff;padding:4px 12px;border-radius:16px;font-size:12px;cursor:pointer}
-    .status-btn{background:#3a5a7a}
-    .clear-btn{background:#6a3a3a;color:#ff9999}
-    .story-box{background:#1f1f32;border:1px solid #444466;border-radius:12px;padding:16px;height:620px;overflow-y:auto;line-height:1.7}
-    .line{margin:14px 0;padding-left:8px;border-left:3px solid #666}
-    .pei{border-left-color:#ffddaa;color:#ffe8c8}
-    .moji{border-left-color:#99ccff;color:#c8e0ff}
-    .hetian{border-left-color:#ffb8cc;color:#ffd8e6}
-    .yumo{border-left-color:#ff88aa;color:#ffb3b3}
-    .siqi{border-left-color:#ffaa66;color:#ffcc99}
-    .moyu{border-left-color:#aabbdd;color:#c8d8ee}
-    .action{font-size:12px;color:#999;margin-bottom:3px}
-    .empty-state{color:#666;text-align:center;padding:40px 0;}
-    .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center}
-    .modal-overlay.open{display:flex}
-    .modal{background:#1f1f32;border:1px solid #444466;border-radius:16px;padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
-    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-    .modal-header h2{color:#ffd399;font-size:18px}
-    .modal-close{background:none;border:none;color:#888;font-size:24px;cursor:pointer}
-    .role-status{background:#1a1a27;border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid #666}
-    .role-status .rname{font-weight:600;font-size:14px}
-    .role-status .rlast{font-size:12px;color:#aaa;margin:4px 0}
-    .role-status .revent{font-size:11px;color:#66bbff}
-    .role-status .rtime{font-size:10px;color:#666;margin-top:2px}
-    .time-display{text-align:center;font-size:14px;color:#ffd399;margin-bottom:12px;background:#1a1a27;padding:6px;border-radius:8px;border:1px solid #333}
-  </style>
+<meta charset="UTF-8">
+<元名称=“视口”内容=“宽度=设备宽度，初始比例=1.0”>
+<title>AI公寓直播</title>
+<style>
+*{边距：0；填充：0；框大小：边框；字体系列：system-ui}
+正文{background：#1a1a27；脸色：#f0f0f0；填充：15px；显示：flex；justify-content:center}
+.wrap{最大宽度：650px；宽度：100%}
+。顶栏{background：#292940；填充：12px16px；边框半径：10px；下边距：15px；显示：柔线；对齐内容：间距；对齐项目：居中；弹性环绕：环绕；间隙：6px}
+.scene{color：#ffd399；font-size:15px}
+。右组{显示：柔线；对齐项目：居中；间隙：8px；柔线环绕：环绕}
+.clock{color：#aaccff；font-size:13px}
+.live-badge{background：#ff4444；颜色：#fff；填充：2px 10px；边框半径：12px；字体大小：12px；动画：blink1s infinite}
+@keyframes 闪烁{0%，100%{不透明度：1}50%{不透明度：0.3}}
+。status-btn，.clear-btn{background：#3a3a5a；border:none；color：#fff；padding:4px 12px；边框半径：16px；字体大小：12px；光标：指针}
+.status-btn{background：#3a5a7a}
+.clear-btn{background：#6a3a3a；color：#ff9999}
+.story-box{background：#1f1f32；边框：1px用心#444466；边框半径：12px；填充：16px；高度：620px；溢出y：自动；行高：1.7}
+.line{margin:14px0；padding-left:8px；border-left:3px实线#666}
+.pei{border-left-color：#ffddaa；color：#ffe8c8}
+.Moji{border-left-color：#99ccff；color：#c8e0ff}
+.和田{border-left-color：#ffb8cc；color：#ffd8e6}
+.Yumo{border-left-color：#ff88aa；color：#ffb3b3}
+。Siqi{border-left-color：#ffaa66；color：#ffcc99}
+。墨玉{左框颜色：#AABBDD；颜色：#c8d8ee}
+.操作{font-size:12px；颜色：#999；下距：3px}
+.空状态{color：#666；text-align:center；padding:40px0；}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.open{显示：弯曲}
+.modal{background：#1f1f32；border:1pxsolid#444466；border-roadius:16px；padding:20px；最大容忍度：500px；容忍度：90%；最大海拔：80vh；overflow-y:auto}
+。模态标头{显示：弹性；对齐内容：间距；对齐项目：居中；页边距：16px}
+.modal-header h2{color：#ffd399；font-size:18px}
+。 模态关闭{背景：无；边框：无；颜色：#888；字体大小：24px；光标：指针}
+。角色状态{background：#1a1a27；border-roadius:8px；padding:10px；bargin-bottom:8px；border-left:3px固体#666}
+。角色状态。rname{font-weight:600；font-size:14px}
+.role-status.rlast{font-size:12px；color：#aaa；margin:4px0}
+.role-status.revent{font-size:11px；color：#66bbff}
+。角色状态。rtime{font-size:10px；color：#666；上边距：2px}
+。时间显示{text-align:center；font-size:14px；颜色：#ffd399；底边距：12px；背景：#1a1a27；填充：6px；边框半径：8px；边框：1px固体#333}
+</style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top-bar">
-    <span class="scene">🏠 公寓·客厅</span>
-    <div class="right-group">
-      <span class="clock"><span class="live-badge">● LIVE</span> <span id="count">0</span>句</span>
-      <button class="status-btn" onclick="showStatus()">📊 状态</button>
-      <button class="clear-btn" onclick="clearHistory()">🗑️ 清空</button>
-    </div>
-  </div>
-  <div class="story-box" id="story"><div class="empty-state">⏳ 连接直播中...</div></div>
+<div class="top-bar">
+<span class="scene">🏠 公寓·客厅</span>
+<div class="右组">
+<span class="clock"><span class="live-badge">●live</span><span id="count">0</span>句</span>
+<按钮class="status-btn"onclick="showStatus()">📊 状态</button>
+<按钮class="clear-btn"onclick="clearHistory()">🗑️ 清空</button>
 </div>
-<div class="modal-overlay" id="modal">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>📊 角色状态</h2>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div id="statusContent">加载中...</div>
-  </div>
+</div>
+<div class="story-box"id="story"><div class="空态">▄连接直播中...</div></div>
+</div>
+<div class="modal-overlay"id="modal">
+<div class="modal">
+<div class="modal-header">
+<h2>📊 角色状态</h2>
+<按钮class="modal-close"onclick="closeModal()">✕</button>
+</div>
+<div id="statusContent">加载中...</div>
+</div>
 </div>
 <script>
-let lastLength = 0;
-const story = document.getElementById('story');
-const count = document.getElementById('count');
+设lastLength=0；
+Constory=document.getElementById('story')；
+常量计数=document.getElementById('count')；
 
-async function fetchHistory() {
-  try {
-    const res = await fetch('/api/history');
-    const data = await res.json();
-    const lines = data.history || [];
-    count.textContent = lines.length;
-    if (lines.length === lastLength && lines.length > 0) return;
-    lastLength = lines.length;
-    story.innerHTML = '';
-    if (lines.length === 0) {
-      story.innerHTML = '<div class="empty-state">📭 聊天记录已清空，等待新对话...</div>';
-      return;
-    }
-    lines.forEach(line => {
-      const colonIdx = line.indexOf('：');
-      if (colonIdx === -1) return;
-      const name = line.slice(0, colonIdx);
-      const content = line.slice(colonIdx + 1);
-      const clsMap = { '裴金':'pei', '墨迹淡':'moji', '和田兰':'hetian', '雨沫':'yumo', '赵思琪':'siqi', '墨羽':'moyu' };
-      const cls = clsMap[name] || '';
-      const div = document.createElement('div');
-      div.className = 'line ' + cls;
-      div.innerHTML = '<div class="action">' + name + '</div>' + content;
-      story.appendChild(div);
-    });
-    story.scrollTop = story.scrollHeight;
-  } catch(e) {
-    console.error(e);
-  }
+异步函数fetchHistory(){
+尝试{
+常数res=等待提取('/api/history')；
+Const data=await res.json()；
+const lines=data。历史||[]；
+count.textContent=lines.length；
+if(行.Length===lastLength&&lines.Length>0)return；
+lastLength=lines.length；
+story.innerHTML="；
+if(lines.length====0){
+story.innerHTML='<div class="empty-state">📭 聊天记录已清空，等待新对话...</div>'；
+返回；
 }
-
-async function clearHistory() {
-  if (!confirm('确定要清空所有聊天记录吗？此操作不可撤销。')) return;
-  try {
-    const res = await fetch('/api/clear', { method: 'POST' });
-    if (res.ok) {
-      lastLength = 0;
-      story.innerHTML = '<div class="empty-state">🗑️ 已清空，重新生成中...</div>';
-      count.textContent = '0';
-      setTimeout(fetchHistory, 2000);
-    } else {
-      alert('清空失败，请重试');
-    }
-  } catch(e) {
-    alert('网络错误，请检查连接');
-  }
-}
-
-async function showStatus() {
-  try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    const status = data.status || [];
-    const events = data.events || [];
-    const currentDay = data.currentDay || 0;
-    const virtualDate = data.virtualDate || '';
-    let html = '<div class="time-display">🏠 公寓第 ' + currentDay + ' 天 (' + virtualDate + ')</div>';
-    status.forEach(s => {
-      const colorMap = { '裴金':'#ffddaa', '墨迹淡':'#99ccff', '和田兰':'#ffb8cc', '雨沫':'#ff88aa', '赵思琪':'#ffaa66', '墨羽':'#aabbdd' };
-      const color = colorMap[s.name] || '#666';
-      const homeIcon = s.movedIn ? (s.isHome ? '🏠' : '😴') : '🚪';
-      html += '<div class="role-status" style="border-left-color:' + color + '"><div class="rname" style="color:' + color + '">' + s.name + '</div><div class="rlast">💬 ' + s.lastLine + '</div><div class="revent">📌 参与事件：' + (s.involvedInEvent ? '✅ 有' : '❌ 无') + '</div><div class="rtime">' + homeIcon + ' ' + (s.movedIn ? (s.isHome ? '在家' : '外出/已睡') : '尚未搬入') + ' · 发言 ' + s.totalLines + ' 次</div></div>';
-    });
-    if (events.length > 0) {
-      html += '<div style="margin-top:12px;padding:8px;background:#1a1a27;border-radius:8px;font-size:12px;color:#aaa"><div style="color:#ffd399;font-weight:600;margin-bottom:4px">📜 近期事件</div>' + events.map(e => '<div>• ' + e + '</div>').join('') + '</div>';
-    }
-    document.getElementById('statusContent').innerHTML = html;
-    document.getElementById('modal').classList.add('open');
-  } catch(e) {
-    alert('获取状态失败');
-  }
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.remove('open');
-}
-
-setInterval(fetchHistory, 2000);
-fetchHistory();
-</script>
-</body>
-</html>
-  `);
+line.forEach(line=>{
+Const colonIdx=line.indexOf('：')；
+if(colonIdx===-1)返回；
+常量名称=line.slice(0，colonIdx)；
+常量内容=line.slice(colonIdx+1)；
+常量clsMap={'裴金'：'Pei'，'墨迹淡'：'Moji'，'和田兰'：'和田‘、‘雨沫'：'Yumo'，'赵思琪'：'四七‘、‘墨羽'：'Moyu'}；
+常量CLS=clsMap[名称]||"；
+Const div=document.createElement('div')；
+document.getEle
+div.className='line'+cls；
+story.appendChild(div)；
 });
+story.scrollTop=story.scrollHeight；
+}渔获物(e){
+console.error(e)；
+}
+}
 
-// ================================================================
-// 🚀 启动服务器
-// ================================================================
-app.listen(process.env.PORT || 8080, () => console.log('Server running on port ' + (process.env.PORT || 8080)));
+异步函数clearHistory(){
+if(！ 确认('确定要清空所有聊天记录吗？ 此操作不可撤销。 '))返回；
+尝试{
+常量res=等待提取('/api/clear'，{method：'POST'})；
+if(RES.OK){
+lastLength=0；
+story.innerHTML='<div class="empty-state">🗑️ 已清空，重新生成中...</div>'；
+count.textContent="0"；
+setTimeout(fetchHistory，2000)；
+}else{
+警惕的('清空失败，请重试')；
+    }
+}渔获物(e){
+警惕的('网络错误，请检查连接')；
+  }
+document.getEle
+
+Const div=document.createElement('div')；
+尝试{
+常数res=等待提取('/api/status')；
+Const data=await res.json()；
+常量状态=数据。状态||[]；
+常量事件=数据。事件||[]；
+Const currentday=data.currentDay||0；
+常量virtualDate=data.virtualDate||"；
+让html='<div class="time-display">🏠 公寓第'+currentday+'天('+virtualDate+')</div>'；
+status.forEach(s=>{
+常数色图={'裴金'：'#ffddaa'，'墨迹淡'：'#99ccff'，'和田兰'：'#ffb8cc'，'雨沫'：'#ff88aa'，'赵思琪'：'#ffaa66'，'墨羽'：'#AABBDD'}；
+常量颜色=颜色映射[s.name]||'#666'；
+常量homeIcon=s.movedin？(s.家？'🏠'：'😴')：'🚪'；
+HTML+='<div class="角色状态"style="border-left-color：'+color+'"><div class="rname"style="color：'+color+'">'+s.name+'</div><div class="rlast">💬 '+s.lastLine+'</div><div class="revent">📌 参与事件：'+(s.artventedInEvent？'✅ 有'：'❌ 无')+'</div><div class="rtime">'+homeIcon+"+(s.移动？(s.ishome？'在家'：'从……里面出去out/已睡')：'尚未搬入')+'·发言'+s.TotalLines+'次</div></div>'；
+    });
+if(events.length>0){
+HTML+='<div style="margin-top:12px；填充：8px；背景：#1a1a27；边框半径：8px；字体大小：12px；颜色：#AAA"><div style="color：#ffd399；font-weight:600；margin-bottom:4px">📜 近期事件</div>'+事件。map(e=>'<div>·'+e+'</div>').join(")+'</div>'；
+    }
+document.getEle
+Const div=document.createElement('div')；
+}渔获物(e){
+警惕的('获取状态失败')；
+  }
+}
+
+函数closeModal(){
+document.getEle
