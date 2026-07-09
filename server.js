@@ -7,7 +7,7 @@ app.use(express.json());
 const API_KEY = "sk-814290bb204845858ff2305a4a5a0d01";
 
 const CONFIG = {
-  REAL_MINUTES_PER_DAY: 3,
+  REAL_MINUTES_PER_DAY: 1,
   START_DATE: new Date(2024, 0, 1),
 };
 
