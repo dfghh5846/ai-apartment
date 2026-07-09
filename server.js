@@ -552,3 +552,4 @@ HTML+='<div class="角色状态"style="border-left-color：'+color+'"><div class
     });
 if(events.length>0){
 HTML+='<div style="margin-top:12px；填充：8px；背景：#1a1a27；边框半径：8px；字体大小：12px；颜色：#AAA"><div style="color：#ffd399；font-weight:600；margin-bottom:4px">📜 近期事件</div>'+events.map(e=>'<div
+app.listen(process.env.PORT || 8080, () => console.log('Server running on port ' + (process.env.PORT || 8080)));
