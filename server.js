@@ -11,7 +11,7 @@ const CONFIG = { REAL_MINUTES_PER_DAY: 24, START_DATE: new Date(2024, 0, 1) };
 
 const MOVE_IN_DAY = {
   '裴金': 1, '墨迹淡': 1, '和田兰': 1,
-  '雨沫': 2, '赵思琪': 3, '唐吉柯德': 5, '墨羽': 15
+  '雨沫': 2, '赵思琪': 3, '唐吉柯德': 5, '墨尾': 15
 };
 
 const WORK_SCHEDULE = {
@@ -20,14 +20,14 @@ const WORK_SCHEDULE = {
   '雨沫': { start: 8, end: 17 },
   '赵思琪': { start: 8, end: 17 },
   '唐吉柯德': { start: 8, end: 17 },
-  '墨羽': null
+  '墨尾': null
 };
 
 const SLEEP_SCHEDULE = {
   '裴金': { start: 22, end: 6 }, '墨迹淡': { start: 2, end: 10 },
   '和田兰': { start: 23, end: 7 }, '雨沫': { start: 21, end: 6 },
   '赵思琪': { start: 23, end: 6 }, '唐吉柯德': { start: 23, end: 7 },
-  '墨羽': { start: 1, end: 9 }
+  '墨尾': { start: 1, end: 9 }
 };
 
 let SERVER_START = Date.now();
@@ -160,7 +160,7 @@ const roles = [
     hunger: 40, thirst: 40, hungerTolerance: 45, thirstTolerance: 45, hungerDecay: 2, thirstDecay: 2
   },
   {
-    name: '墨羽',
+    name: '墨尾',
     persona: '26岁男生，黑长直发，沉默寡言反应慢。但理性和感性都很强，能看透本质。',
     speakingStyle: '话很少，但每一句都说到点上。不轻易开口，开口就是关键。喜欢用停顿制造沉默，让别人自己消化。',
     sample: '「……（沉默几秒）人要是想走，留不住。不想走，赶不走。」',
@@ -243,7 +243,7 @@ const storyMemory = {
     '雨沫': ['想告诉裴金自己的事'],
     '赵思琪': ['想学点真东西'],
     '唐吉柯德': ['想让别人相信收尾人'],
-    '墨羽': ['想跟人好好聊一次']
+    '墨尾': ['想跟人好好聊一次']
   },
   events: [],
   _counters: {}
@@ -288,7 +288,7 @@ function getIntroLine(roleName) {
     '雨沫': '我、我是雨沫…',
     '赵思琪': '哼！赵思琪！记住了啊！',
     '唐吉柯德': '（推门）正义的收尾人，唐吉柯德，参上！',
-    '墨羽': '……墨羽。'
+    '墨尾': '……墨尾。'
   };
   return intros[roleName] || `${roleName}：大家好。`;
 }
