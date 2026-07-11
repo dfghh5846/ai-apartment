@@ -4,7 +4,7 @@
   "description": "AI公寓直播",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.cjs"
   },
   "dependencies": {
     "express": "^4.18.2",
