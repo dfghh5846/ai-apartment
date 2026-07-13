@@ -1,12 +1,12 @@
-const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 8080;
+Const表达 = require('express');
+Const应用程序 = express();
+Const港口 = process.env.PORT || 8080;
 
-const MAX_HISTORY = 40;
-const FRONTEND_DISPLAY = 15;
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
+ConstMAX_HISTORY = 40;
+ConstFRONTEND_DISPLAY = 15;
+ConstNVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
 
-const roles = [
+Const角色 = [
   {
     name: '裴金', gender: '女', height: '164cm', weight: '60kg',
     appearance: '金发短金发，金框眼镜',
@@ -14,7 +14,7 @@ const roles = [
     speakingStyle: '犹豫、自我否定、总道歉，说话轻声细语',
     roomLocation: '东侧', roomNumber: '101', roomNeighbors: '隔壁是墨迹淡',
     loveStyle: '渴望被爱又不敢靠近',
-    hungerTolerance: 40, thirstTolerance: 50, fatigueTolerance: 60,
+    hungerTolerance: 40, 耐干性: 50, fatigueTolerance: 60,
     goals: ['被大家接纳', '不再害怕说错话', '找到一个能依赖的人'],
     sleepStart: 21, sleepTolerance: 30, sleepDuration: 18,
     roomDesc: '床单是浅粉色的，枕头边放着一只旧布熊，书桌上摆着一盆快枯的绿萝。'
@@ -26,7 +26,7 @@ const roles = [
     speakingStyle: '尖锐毒舌，偶尔流露出温柔，话很少',
     roomLocation: '东侧', roomNumber: '102', roomNeighbors: '隔壁是裴金',
     loveStyle: '口是心非型',
-    hungerTolerance: 50, thirstTolerance: 40, fatigueTolerance: 50,
+    hungerTolerance: 50, 耐干性: 40, fatigueTolerance: 50,
     background: '用数字策略合法套现32000元，与父母有分歧',
     goals: ['证明自己不是怪人', '找到一个能理解自己的人', '做出点真正厉害的事'],
     sleepStart: 2, sleepTolerance: 60, sleepDuration: 16,
@@ -39,7 +39,7 @@ const roles = [
     speakingStyle: '坚定、正气凛然，说话干脆',
     roomLocation: '西侧', roomNumber: '103', roomNeighbors: '隔壁是何田兰',
     loveStyle: '正直专一',
-    hungerTolerance: 45, thirstTolerance: 45, fatigueTolerance: 40,
+    hungerTolerance: 45, 耐干性: 45, fatigueTolerance: 40,
     goals: ['守护大家', '提升自己的武艺', '弄清楚师父的秘密'],
     sleepStart: 22, sleepTolerance: 40, sleepDuration: 16,
     roomDesc: '床上铺着白色床单，枕边放着一本《内家拳法》，墙上挂着一把木剑。'
@@ -51,7 +51,7 @@ const roles = [
     speakingStyle: '甜腻温柔，话里有刺，喜欢用"亲爱的"',
     roomLocation: '西侧', roomNumber: '104', roomNeighbors: '隔壁是雨沫',
     loveStyle: '操控型病娇',
-    hungerTolerance: 30, thirstTolerance: 30, fatigueTolerance: 40,
+    hungerTolerance: 30, 耐干性: 30, fatigueTolerance: 40,
     goals: ['掌控每个人', '让所有人都依赖我', '挖掘每个人的弱点'],
     sleepStart: 23, sleepTolerance: 35, sleepDuration: 16,
     roomDesc: '窗帘是深红色的，床上堆着好几个抱枕，梳妆台上摆满了瓶瓶罐罐。'
@@ -590,7 +590,7 @@ async function callAI(role, prompt, retryCount = 0) {
         'X-Title': 'AI Apartment'
       },
       body: JSON.stringify({
-        model: 'mistralai/mistral-7b-instruct:free',
+        model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
         messages: [
           { role: 'system', content: `你叫${role.name}，${role.gender}，你的性格是：${role.persona}。你的说话风格是：${role.speakingStyle}。你可以用括号描述动作，比如（拿起茶杯）、（低下头），让对话生动。不要用括号写内心独白，只写动作。说话自然，带情绪。禁止英文。` },
           { role: 'user', content: prompt }
