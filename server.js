@@ -590,7 +590,7 @@ async function callAI(role, prompt, retryCount = 0) {
         'X-Title': 'AI Apartment'
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat',
+        model: 'mistralai/mistral-7b-instruct:free',
         messages: [
           { role: 'system', content: `你叫${role.name}，${role.gender}，你的性格是：${role.persona}。你的说话风格是：${role.speakingStyle}。你可以用括号描述动作，比如（拿起茶杯）、（低下头），让对话生动。不要用括号写内心独白，只写动作。说话自然，带情绪。禁止英文。` },
           { role: 'user', content: prompt }
